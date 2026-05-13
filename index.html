@@ -18,9 +18,10 @@ body{
     color:#e5e7eb;
 }
 
+/* HEADER */
 header{
     background:#0f172a;
-    padding:14px 18px;
+    padding:16px 20px;
     display:flex;
     justify-content:space-between;
     align-items:center;
@@ -29,28 +30,58 @@ header{
 
 h1{
     margin:0;
-    font-size:15px;
+    font-size:18px;
     color:#93c5fd;
 }
 
+/* BUTTONS */
 button{
     background:#2563eb;
     color:white;
     border:none;
-    padding:8px 12px;
-    border-radius:8px;
+    padding:10px 14px;
+    border-radius:10px;
     cursor:pointer;
-    margin-left:6px;
+    font-size:14px;
+    margin-left:8px;
 }
 
 button:hover{ background:#1d4ed8; }
 
 .container{
-    padding:18px;
+    padding:20px;
     max-width:1400px;
     margin:auto;
 }
 
+/* KPI */
+.kpi{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin-bottom:18px;
+}
+
+.kpi-box{
+    background:#111827;
+    border:1px solid #1f2937;
+    border-radius:14px;
+    padding:14px;
+}
+
+.kpi-title{
+    font-size:14px;
+    color:#93c5fd;
+}
+
+.kpi-value{
+    font-size:22px;
+    font-weight:700;
+    color:#60a5fa;
+    margin-top:6px;
+}
+
+/* CARDS */
 .card{
     background:#111827;
     border:1px solid #1f2937;
@@ -59,46 +90,27 @@ button:hover{ background:#1d4ed8; }
     margin-bottom:18px;
 }
 
-canvas{
-    width:100% !important;
-    height:420px !important;
-}
-
-/* KPI */
-.kpi{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:12px;
-    margin-bottom:18px;
-}
-
-.kpi-box{
-    background:#111827;
-    border:1px solid #1f2937;
-    border-radius:12px;
-    padding:12px;
-}
-
-.kpi-title{
-    font-size:12px;
+.card h3{
+    margin:0 0 12px 0;
+    font-size:15px;
     color:#93c5fd;
 }
 
-.kpi-value{
-    font-size:18px;
-    font-weight:700;
-    color:#60a5fa;
-    margin-top:4px;
+/* CANVAS */
+canvas{
+    width:100% !important;
+    height:420px !important;
 }
 
 /* TABLE */
 table{
     width:100%;
     border-collapse:collapse;
+    font-size:15px;
 }
 
 th, td{
-    padding:10px;
+    padding:12px;
     border-bottom:1px solid #1f2937;
 }
 
@@ -115,18 +127,21 @@ td:first-child{
     text-align:left;
 }
 
+/* SELECT */
 select{
-    padding:8px;
-    border-radius:8px;
+    padding:10px;
+    border-radius:10px;
     background:#111827;
-    color:white;
     border:1px solid #1f2937;
+    color:#e5e7eb;
+    font-size:14px;
 }
 
+/* STATUS */
 #status{
     margin-bottom:10px;
     color:#fbbf24;
-    font-size:13px;
+    font-size:14px;
 }
 
 </style>
@@ -144,7 +159,7 @@ select{
 
 <div class="container">
 
-<div id="status">Chargement...</div>
+<div id="status">Chargement des données...</div>
 
 <div class="kpi" id="kpi"></div>
 
@@ -183,7 +198,8 @@ let DATA;
 // ================= LOAD =================
 async function load(){
 
-    document.getElementById("status").innerText = "Chargement des données...";
+    document.getElementById("status").innerText =
+        "Chargement des données...";
 
     const res = await fetch(CSV_URL + "?v=" + Date.now());
     const text = await res.text();
@@ -225,7 +241,6 @@ function process(raw){
     const min = Math.min(...values);
     const max = Math.max(...values);
 
-    // MONTHLY SUM
     const monthly = {};
     raw.forEach(r=>{
         const m = r.date.slice(3,10);
@@ -256,19 +271,12 @@ function renderKPI(){
 
     const k = DATA.kpi;
 
-    const html = [
-        ["Somme",k.sum],
-        ["Moyenne",k.mean],
-        ["Min",k.min],
-        ["Max",k.max]
-    ].map(x=>`
-        <div class="kpi-box">
-            <div class="kpi-title">${x[0]}</div>
-            <div class="kpi-value">${x[1].toFixed(2)}</div>
-        </div>
-    `).join("");
-
-    document.getElementById("kpi").innerHTML = html;
+    document.getElementById("kpi").innerHTML = `
+        <div class="kpi-box"><div class="kpi-title">Somme</div><div class="kpi-value">${k.sum.toFixed(2)}</div></div>
+        <div class="kpi-box"><div class="kpi-title">Moyenne</div><div class="kpi-value">${k.mean.toFixed(2)}</div></div>
+        <div class="kpi-box"><div class="kpi-title">Minimum</div><div class="kpi-value">${k.min.toFixed(2)}</div></div>
+        <div class="kpi-box"><div class="kpi-title">Maximum</div><div class="kpi-value">${k.max.toFixed(2)}</div></div>
+    `;
 }
 
 // ================= ANNUAL =================
@@ -279,31 +287,42 @@ function renderAnnual(){
     annualChart = new Chart(document.getElementById("annualChart"),{
         type:"line",
         data:{
-            labels:DATA.raw.map((d,i)=>{
-                const step = Math.ceil(DATA.raw.length/12);
-                return i % step === 0 ? d.date : "";
-            }),
+            labels:DATA.raw.map(d=>d.date),
             datasets:[{
                 data:DATA.raw.map(d=>d.debit),
                 borderColor:"#60a5fa",
                 pointRadius:0,
+                pointHoverRadius:6,
                 tension:0.25
             }]
         },
         options:{
             responsive:true,
             maintainAspectRatio:false,
-            plugins:{legend:{display:false}},
+            plugins:{
+                legend:{display:false},
+                tooltip:{
+                    enabled:true,
+                    callbacks:{
+                        title:(ctx)=>"Date: " + ctx[0].label,
+                        label:(ctx)=>"Débit: " + ctx.parsed.y.toFixed(2)
+                    },
+                    bodyFont:{size:14},
+                    titleFont:{size:15},
+                    displayColors:false
+                }
+            },
             scales:{
                 x:{
                     ticks:{
                         maxRotation:0,
                         autoSkip:true,
-                        maxTicksLimit:10
+                        maxTicksLimit:10,
+                        font:{size:13}
                     }
                 },
                 y:{
-                    ticks:{precision:0}
+                    ticks:{font:{size:13}}
                 }
             }
         }
@@ -325,16 +344,17 @@ function renderMonthly(){
             }]
         },
         options:{
-            responsive:true,
-            maintainAspectRatio:false,
-            plugins:{legend:{display:false}},
-            scales:{
-                x:{
-                    ticks:{
-                        maxRotation:0,
-                        autoSkip:true
-                    }
+            plugins:{
+                legend:{display:false},
+                tooltip:{
+                    bodyFont:{size:14},
+                    titleFont:{size:15},
+                    displayColors:false
                 }
+            },
+            scales:{
+                x:{ticks:{font:{size:13}}},
+                y:{ticks:{font:{size:13}}}
             }
         }
     });
@@ -371,13 +391,23 @@ function renderMonth(){
             datasets:[{
                 data:data.map(d=>d.debit),
                 borderColor:"#22c55e",
-                pointRadius:2
+                pointRadius:2,
+                pointHoverRadius:6
             }]
         },
         options:{
-            responsive:true,
-            maintainAspectRatio:false,
-            plugins:{legend:{display:false}}
+            plugins:{
+                legend:{display:false},
+                tooltip:{
+                    callbacks:{
+                        title:(ctx)=>"Date: " + ctx[0].label,
+                        label:(ctx)=>"Débit: " + ctx.parsed.y.toFixed(2)
+                    },
+                    bodyFont:{size:14},
+                    titleFont:{size:15},
+                    displayColors:false
+                }
+            }
         }
     });
 }
