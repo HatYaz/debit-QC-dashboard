@@ -4,127 +4,91 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Débit Québec — Tableau de bord exécutif</title>
+<title>Débit Québec — Tableau de bord</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
 
-:root{
-    --bg:#0b1220;
-    --panel:#111827;
-    --border:#1f2937;
-    --text:#e5e7eb;
-    --muted:#93c5fd;
-    --accent:#60a5fa;
-    --green:#22c55e;
-}
-
 body{
     margin:0;
-    font-family:"Segoe UI", system-ui, Arial;
-    background:var(--bg);
-    color:var(--text);
+    font-family:"Segoe UI", Arial;
+    background:#0b1220;
+    color:#e5e7eb;
 }
 
-/* HEADER */
 header{
-    position:sticky;
-    top:0;
-    z-index:100;
-    background:rgba(15,23,42,0.95);
-    backdrop-filter: blur(10px);
-    border-bottom:1px solid var(--border);
-    padding:16px 22px;
+    background:#0f172a;
+    padding:14px 18px;
     display:flex;
     justify-content:space-between;
     align-items:center;
+    border-bottom:1px solid #1f2937;
 }
 
-header h1{
+h1{
     margin:0;
     font-size:15px;
-    letter-spacing:0.5px;
-    color:var(--muted);
+    color:#93c5fd;
 }
 
-.actions button{
+button{
     background:#2563eb;
-    border:none;
     color:white;
-    padding:9px 14px;
-    border-radius:10px;
-    margin-left:8px;
+    border:none;
+    padding:8px 12px;
+    border-radius:8px;
     cursor:pointer;
-    font-weight:500;
+    margin-left:6px;
 }
 
-.actions button:hover{
-    background:#1d4ed8;
-}
+button:hover{ background:#1d4ed8; }
 
-/* LAYOUT */
 .container{
-    padding:22px;
+    padding:18px;
     max-width:1400px;
     margin:auto;
 }
 
-/* GRID */
-.grid{
-    display:grid;
-    grid-template-columns:repeat(12,1fr);
-    gap:16px;
-}
-
-/* CARDS */
 .card{
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:16px;
+    background:#111827;
+    border:1px solid #1f2937;
+    border-radius:14px;
     padding:16px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    margin-bottom:18px;
 }
 
-.card h3{
-    margin:0 0 12px 0;
-    font-size:13px;
-    color:var(--muted);
-    letter-spacing:0.4px;
+canvas{
+    width:100% !important;
+    height:420px !important;
 }
 
 /* KPI */
 .kpi{
     display:grid;
     grid-template-columns:repeat(4,1fr);
-    gap:14px;
+    gap:12px;
     margin-bottom:18px;
 }
 
 .kpi-box{
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:14px;
+    background:#111827;
+    border:1px solid #1f2937;
+    border-radius:12px;
+    padding:12px;
 }
 
 .kpi-title{
     font-size:12px;
-    color:var(--muted);
+    color:#93c5fd;
 }
 
 .kpi-value{
-    font-size:20px;
+    font-size:18px;
     font-weight:700;
-    color:var(--accent);
-    margin-top:6px;
-}
-
-/* CHART */
-canvas{
-    width:100% !important;
-    height:420px !important;
+    color:#60a5fa;
+    margin-top:4px;
 }
 
 /* TABLE */
@@ -134,14 +98,13 @@ table{
 }
 
 th, td{
-    padding:10px 12px;
-    border-bottom:1px solid var(--border);
+    padding:10px;
+    border-bottom:1px solid #1f2937;
 }
 
 th{
-    color:var(--muted);
     text-align:left;
-    font-size:12px;
+    color:#93c5fd;
 }
 
 td{
@@ -152,20 +115,18 @@ td:first-child{
     text-align:left;
 }
 
-/* STATUS */
-#status{
-    font-size:12px;
-    color:#fbbf24;
-    margin-bottom:10px;
+select{
+    padding:8px;
+    border-radius:8px;
+    background:#111827;
+    color:white;
+    border:1px solid #1f2937;
 }
 
-/* SELECT */
-select{
-    padding:8px 10px;
-    border-radius:10px;
-    background:var(--panel);
-    border:1px solid var(--border);
-    color:var(--text);
+#status{
+    margin-bottom:10px;
+    color:#fbbf24;
+    font-size:13px;
 }
 
 </style>
@@ -175,7 +136,7 @@ select{
 
 <header>
     <h1>Débit Québec — Tableau de bord exécutif</h1>
-    <div class="actions">
+    <div>
         <button onclick="refresh()">🔄 Mise à jour</button>
         <button onclick="downloadCSV()">⬇ Télécharger CSV</button>
     </div>
@@ -183,31 +144,26 @@ select{
 
 <div class="container">
 
-<div id="status">Chargement des données...</div>
+<div id="status">Chargement...</div>
 
-<!-- KPI -->
 <div class="kpi" id="kpi"></div>
 
-<!-- ANNUAL -->
 <div class="card">
     <h3>📈 Débit annuel</h3>
     <canvas id="annualChart"></canvas>
 </div>
 
-<!-- MONTHLY -->
 <div class="card">
     <h3>📊 Débit mensuel (total)</h3>
     <canvas id="monthlyChart"></canvas>
 </div>
 
-<!-- MONTH DETAIL -->
 <div class="card">
     <h3>📅 Analyse par mois</h3>
-    <select id="monthSelect" onchange="renderMonthDetail()"></select>
-    <canvas id="monthChart" style="margin-top:14px;"></canvas>
+    <select id="monthSelect" onchange="renderMonth()"></select>
+    <canvas id="monthChart" style="margin-top:12px;"></canvas>
 </div>
 
-<!-- STATS -->
 <div class="card">
     <h3>📋 Statistiques</h3>
     <table>
@@ -227,6 +183,8 @@ let DATA;
 // ================= LOAD =================
 async function load(){
 
+    document.getElementById("status").innerText = "Chargement des données...";
+
     const res = await fetch(CSV_URL + "?v=" + Date.now());
     const text = await res.text();
 
@@ -241,14 +199,20 @@ async function load(){
     parsed.data.forEach(r=>{
         if(!r.Date || !r.Debit) return;
 
+        const v = parseFloat(r.Debit);
+        if(isNaN(v)) return;
+
         raw.push({
             date:r.Date,
-            debit:parseFloat(r.Debit)
+            debit:v
         });
     });
 
     DATA = process(raw);
     renderAll();
+
+    document.getElementById("status").innerText =
+        "✔ Données chargées : " + raw.length + " lignes";
 }
 
 // ================= PROCESS =================
@@ -261,7 +225,7 @@ function process(raw){
     const min = Math.min(...values);
     const max = Math.max(...values);
 
-    // monthly
+    // MONTHLY SUM
     const monthly = {};
     raw.forEach(r=>{
         const m = r.date.slice(3,10);
@@ -278,7 +242,7 @@ function process(raw){
     };
 }
 
-// ================= RENDER =================
+// ================= RENDER ALL =================
 function renderAll(){
     renderKPI();
     renderAnnual();
@@ -315,7 +279,10 @@ function renderAnnual(){
     annualChart = new Chart(document.getElementById("annualChart"),{
         type:"line",
         data:{
-            labels:DATA.raw.map(d=>d.date),
+            labels:DATA.raw.map((d,i)=>{
+                const step = Math.ceil(DATA.raw.length/12);
+                return i % step === 0 ? d.date : "";
+            }),
             datasets:[{
                 data:DATA.raw.map(d=>d.debit),
                 borderColor:"#60a5fa",
@@ -325,7 +292,20 @@ function renderAnnual(){
         },
         options:{
             responsive:true,
-            plugins:{legend:{display:false}}
+            maintainAspectRatio:false,
+            plugins:{legend:{display:false}},
+            scales:{
+                x:{
+                    ticks:{
+                        maxRotation:0,
+                        autoSkip:true,
+                        maxTicksLimit:10
+                    }
+                },
+                y:{
+                    ticks:{precision:0}
+                }
+            }
         }
     });
 }
@@ -344,7 +324,19 @@ function renderMonthly(){
                 backgroundColor:"#2563eb"
             }]
         },
-        options:{plugins:{legend:{display:false}}}
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{legend:{display:false}},
+            scales:{
+                x:{
+                    ticks:{
+                        maxRotation:0,
+                        autoSkip:true
+                    }
+                }
+            }
+        }
     });
 }
 
@@ -357,15 +349,15 @@ function fillMonths(){
     DATA.monthly.labels.forEach(m=>{
         const opt = document.createElement("option");
         opt.value = m;
-        opt.innerText = m;
+        opt.textContent = m;
         sel.appendChild(opt);
     });
 
-    renderMonthDetail();
+    renderMonth();
 }
 
 // ================= MONTH DETAIL =================
-function renderMonthDetail(){
+function renderMonth(){
 
     const m = document.getElementById("monthSelect").value;
     const data = DATA.raw.filter(d=>d.date.includes(m));
@@ -382,7 +374,11 @@ function renderMonthDetail(){
                 pointRadius:2
             }]
         },
-        options:{plugins:{legend:{display:false}}}
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{legend:{display:false}}
+        }
     });
 }
 
