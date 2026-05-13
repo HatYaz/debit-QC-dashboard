@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Débit Québec — Tableau de bord</title>
+<title>Débit Québec — Dashboard</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -18,10 +18,9 @@ body{
     color:#e5e7eb;
 }
 
-/* HEADER */
 header{
     background:#0f172a;
-    padding:16px 20px;
+    padding:14px 18px;
     display:flex;
     justify-content:space-between;
     align-items:center;
@@ -34,7 +33,6 @@ h1{
     color:#93c5fd;
 }
 
-/* BUTTONS */
 button{
     background:#2563eb;
     color:white;
@@ -43,7 +41,7 @@ button{
     border-radius:10px;
     cursor:pointer;
     font-size:14px;
-    margin-left:8px;
+    margin-left:6px;
 }
 
 button:hover{ background:#1d4ed8; }
@@ -65,7 +63,7 @@ button:hover{ background:#1d4ed8; }
 .kpi-box{
     background:#111827;
     border:1px solid #1f2937;
-    border-radius:14px;
+    border-radius:12px;
     padding:14px;
 }
 
@@ -90,12 +88,6 @@ button:hover{ background:#1d4ed8; }
     margin-bottom:18px;
 }
 
-.card h3{
-    margin:0 0 12px 0;
-    font-size:15px;
-    color:#93c5fd;
-}
-
 /* CANVAS */
 canvas{
     width:100% !important;
@@ -115,8 +107,8 @@ th, td{
 }
 
 th{
-    text-align:left;
     color:#93c5fd;
+    text-align:left;
 }
 
 td{
@@ -127,17 +119,15 @@ td:first-child{
     text-align:left;
 }
 
-/* SELECT */
 select{
     padding:10px;
     border-radius:10px;
     background:#111827;
-    border:1px solid #1f2937;
     color:#e5e7eb;
+    border:1px solid #1f2937;
     font-size:14px;
 }
 
-/* STATUS */
 #status{
     margin-bottom:10px;
     color:#fbbf24;
@@ -257,6 +247,40 @@ function process(raw){
     };
 }
 
+// ================= COMMON OPTIONS =================
+const commonOptions = {
+    responsive:true,
+    maintainAspectRatio:false,
+    plugins:{
+        legend:{
+            labels:{ font:{ size:16 } }
+        },
+        tooltip:{
+            enabled:true,
+            displayColors:false,
+            titleFont:{ size:16 },
+            bodyFont:{ size:15 },
+            callbacks:{
+                title:(ctx)=>"Date: " + ctx[0].label,
+                label:(ctx)=>"Débit: " + ctx.parsed.y.toFixed(2)
+            }
+        }
+    },
+    scales:{
+        x:{
+            ticks:{
+                font:{ size:14 },
+                maxRotation:0,
+                autoSkip:true,
+                maxTicksLimit:10
+            }
+        },
+        y:{
+            ticks:{ font:{ size:14 } }
+        }
+    }
+};
+
 // ================= RENDER ALL =================
 function renderAll(){
     renderKPI();
@@ -292,40 +316,11 @@ function renderAnnual(){
                 data:DATA.raw.map(d=>d.debit),
                 borderColor:"#60a5fa",
                 pointRadius:0,
-                pointHoverRadius:6,
+                pointHoverRadius:7,
                 tension:0.25
             }]
         },
-        options:{
-            responsive:true,
-            maintainAspectRatio:false,
-            plugins:{
-                legend:{display:false},
-                tooltip:{
-                    enabled:true,
-                    callbacks:{
-                        title:(ctx)=>"Date: " + ctx[0].label,
-                        label:(ctx)=>"Débit: " + ctx.parsed.y.toFixed(2)
-                    },
-                    bodyFont:{size:14},
-                    titleFont:{size:15},
-                    displayColors:false
-                }
-            },
-            scales:{
-                x:{
-                    ticks:{
-                        maxRotation:0,
-                        autoSkip:true,
-                        maxTicksLimit:10,
-                        font:{size:13}
-                    }
-                },
-                y:{
-                    ticks:{font:{size:13}}
-                }
-            }
-        }
+        options: commonOptions
     });
 }
 
@@ -343,20 +338,7 @@ function renderMonthly(){
                 backgroundColor:"#2563eb"
             }]
         },
-        options:{
-            plugins:{
-                legend:{display:false},
-                tooltip:{
-                    bodyFont:{size:14},
-                    titleFont:{size:15},
-                    displayColors:false
-                }
-            },
-            scales:{
-                x:{ticks:{font:{size:13}}},
-                y:{ticks:{font:{size:13}}}
-            }
-        }
+        options: commonOptions
     });
 }
 
@@ -392,23 +374,10 @@ function renderMonth(){
                 data:data.map(d=>d.debit),
                 borderColor:"#22c55e",
                 pointRadius:2,
-                pointHoverRadius:6
+                pointHoverRadius:7
             }]
         },
-        options:{
-            plugins:{
-                legend:{display:false},
-                tooltip:{
-                    callbacks:{
-                        title:(ctx)=>"Date: " + ctx[0].label,
-                        label:(ctx)=>"Débit: " + ctx.parsed.y.toFixed(2)
-                    },
-                    bodyFont:{size:14},
-                    titleFont:{size:15},
-                    displayColors:false
-                }
-            }
-        }
+        options: commonOptions
     });
 }
 
@@ -417,20 +386,12 @@ function renderStats(){
 
     const k = DATA.kpi;
 
-    const rows = [
-        ["Somme",k.sum],
-        ["Moyenne",k.mean],
-        ["Minimum",k.min],
-        ["Maximum",k.max]
-    ];
-
-    document.getElementById("stats").innerHTML =
-        rows.map(r=>`
-        <tr>
-            <td>${r[0]}</td>
-            <td>${r[1].toFixed(2)}</td>
-        </tr>
-        `).join("");
+    document.getElementById("stats").innerHTML = `
+        <tr><td>Somme</td><td>${k.sum.toFixed(2)}</td></tr>
+        <tr><td>Moyenne</td><td>${k.mean.toFixed(2)}</td></tr>
+        <tr><td>Minimum</td><td>${k.min.toFixed(2)}</td></tr>
+        <tr><td>Maximum</td><td>${k.max.toFixed(2)}</td></tr>
+    `;
 }
 
 // ================= DOWNLOAD =================
