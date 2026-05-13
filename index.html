@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Débit Québec — Tableau de bord</title>
+<title>Débit Québec — Dashboard avancé</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -17,7 +17,7 @@ body {
 
 header {
     background:#0f172a;
-    padding:14px 18px;
+    padding:14px;
     display:flex;
     justify-content:space-between;
     align-items:center;
@@ -37,7 +37,7 @@ button {
     padding:8px 12px;
     border-radius:8px;
     cursor:pointer;
-    margin-left:8px;
+    margin-left:6px;
 }
 
 button:hover { background:#1d4ed8; }
@@ -54,7 +54,15 @@ button:hover { background:#1d4ed8; }
 
 canvas {
     width:100% !important;
-    height:420px !important;
+    height:360px !important;
+}
+
+select {
+    padding:8px;
+    border-radius:6px;
+    background:#111827;
+    color:white;
+    border:1px solid #1f2937;
 }
 
 table {
@@ -68,21 +76,17 @@ th, td {
 }
 
 th {
-    text-align:left;
     color:#93c5fd;
-}
-
-td {
-    text-align:right;
-}
-
-td:first-child {
     text-align:left;
 }
+
+td { text-align:right; }
+
+td:first-child { text-align:left; }
 
 #status {
-    margin:10px 0;
     color:#fbbf24;
+    margin-bottom:10px;
     font-size:13px;
 }
 </style>
@@ -91,16 +95,16 @@ td:first-child {
 <body>
 
 <header>
-    <h1>Débit Québec — Tableau de bord</h1>
+    <h1>Débit Québec — Analyse mensuelle</h1>
     <div>
-        <button onclick="refreshData()">🔄 Mise à jour</button>
-        <button onclick="downloadCSV()">⬇ Télécharger CSV</button>
+        <button onclick="refresh()">🔄 Mise à jour</button>
+        <button onclick="downloadCSV()">⬇ CSV</button>
     </div>
 </header>
 
 <div class="container">
 
-<div id="status">Chargement des données...</div>
+<div id="status">Chargement...</div>
 
 <div class="card">
     <h3>📈 Débit annuel</h3>
@@ -108,12 +112,21 @@ td:first-child {
 </div>
 
 <div class="card">
-    <h3>📊 Débit mensuel (somme)</h3>
+    <h3>📊 Débit mensuel (total)</h3>
     <canvas id="monthlyChart"></canvas>
 </div>
 
 <div class="card">
-    <h3>📋 Statistiques</h3>
+    <h3>📅 Analyse par mois</h3>
+
+    <label>Mois :</label>
+    <select id="monthSelect" onchange="renderMonthDetail()"></select>
+
+    <canvas id="monthDetailChart" style="margin-top:12px;"></canvas>
+</div>
+
+<div class="card">
+    <h3>📋 Statistiques globales</h3>
     <table>
         <tbody id="stats"></tbody>
     </table>
@@ -125,56 +138,34 @@ td:first-child {
 
 const CSV_URL = "./data.csv";
 
-let annualChart = null;
-let monthlyChart = null;
-let DATA = null;
+let annualChart, monthlyChart, detailChart;
+let DATA;
 
 // ================= LOAD =================
-async function loadData(){
+async function load(){
 
-    try {
+    const res = await fetch(CSV_URL + "?v=" + Date.now());
+    const text = await res.text();
 
-        document.getElementById("status").innerText =
-            "Chargement du fichier...";
+    const parsed = Papa.parse(text, {
+        header:true,
+        skipEmptyLines:true,
+        delimitersToGuess:["\t",",",";"]
+    });
 
-        const res = await fetch(CSV_URL + "?v=" + Date.now());
-        const text = await res.text();
+    let raw = [];
 
-        const parsed = Papa.parse(text, {
-            header:true,
-            skipEmptyLines:true,
-            delimitersToGuess:["\t",",",";"]
+    parsed.data.forEach(r=>{
+        if(!r.Date || !r.Debit) return;
+
+        raw.push({
+            date: r.Date,
+            debit: parseFloat(r.Debit)
         });
+    });
 
-        let raw = [];
-
-        for (let r of parsed.data) {
-
-            const date = r.Date;
-            const debit = r.Debit;
-
-            if(!date || !debit) continue;
-
-            const v = parseFloat(debit);
-            if(isNaN(v)) continue;
-
-            raw.push({
-                date: date,
-                debit: v
-            });
-        }
-
-        DATA = process(raw);
-        render();
-
-        document.getElementById("status").innerText =
-            "✔ Données chargées : " + raw.length + " lignes";
-
-    } catch(err){
-        console.error(err);
-        document.getElementById("status").innerText =
-            "❌ Erreur de chargement";
-    }
+    DATA = process(raw);
+    renderAll();
 }
 
 // ================= PROCESS =================
@@ -187,11 +178,10 @@ function process(raw){
     let min = Math.min(...values);
     let max = Math.max(...values);
 
-    // MONTHLY aggregation (SUM)
+    // MONTHLY aggregation
     let monthly = {};
-
     raw.forEach(r=>{
-        let m = r.date.split("/").slice(1).join("/"); // MM/YYYY
+        let m = r.date.slice(3,10);
         if(!monthly[m]) monthly[m] = 0;
         monthly[m] += r.debit;
     });
@@ -206,11 +196,12 @@ function process(raw){
     };
 }
 
-// ================= RENDER =================
-function render(){
+// ================= RENDER ALL =================
+function renderAll(){
     renderAnnual();
     renderMonthly();
     renderStats();
+    fillMonthSelector();
 }
 
 // ================= ANNUAL =================
@@ -225,13 +216,10 @@ function renderAnnual(){
             datasets:[{
                 data: DATA.raw.map(d=>d.debit),
                 borderColor:"#60a5fa",
-                pointRadius:0,
-                tension:0.2
+                pointRadius:0
             }]
         },
-        options:{
-            plugins:{legend:{display:false}}
-        }
+        options:{plugins:{legend:{display:false}}}
     });
 }
 
@@ -247,6 +235,44 @@ function renderMonthly(){
             datasets:[{
                 data: DATA.monthly.values,
                 backgroundColor:"#2563eb"
+            }]
+        },
+        options:{plugins:{legend:{display:false}}}
+    });
+}
+
+// ================= MONTH SELECTOR =================
+function fillMonthSelector(){
+
+    const sel = document.getElementById("monthSelect");
+    sel.innerHTML = "";
+
+    DATA.monthly.labels.forEach(m=>{
+        let opt = document.createElement("option");
+        opt.value = m;
+        opt.innerText = m;
+        sel.appendChild(opt);
+    });
+
+    renderMonthDetail();
+}
+
+// ================= MONTH DETAIL =================
+function renderMonthDetail(){
+
+    const month = document.getElementById("monthSelect").value;
+    const data = DATA.raw.filter(d => d.date.includes(month));
+
+    if(detailChart) detailChart.destroy();
+
+    detailChart = new Chart(document.getElementById("monthDetailChart"), {
+        type:"line",
+        data:{
+            labels: data.map(d=>d.date),
+            datasets:[{
+                data: data.map(d=>d.debit),
+                borderColor:"#22c55e",
+                pointRadius:2
             }]
         },
         options:{
@@ -286,11 +312,11 @@ function downloadCSV(){
 }
 
 // ================= REFRESH =================
-function refreshData(){
-    loadData();
+function refresh(){
+    load();
 }
 
-loadData();
+load();
 
 </script>
 
