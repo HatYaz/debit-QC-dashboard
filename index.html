@@ -1,1 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Débit Québec Dashboard</title>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+body {
+    margin:0;
+    font-family:"Segoe UI", Arial;
+    background:#0b1220;
+    color:#e5e7eb;
+}
+
+header {
+    background:#0f172a;
+    padding:14px 18px;
+    color:#93c5fd;
+    font-weight:600;
+}
+
+.container {
+    padding:18px;
+}
+
+.card {
+    background:#111827;
+    padding:14px;
+    border-radius:12px;
+    border:1px solid #1f2937;
+}
+
+canvas {
+    width:100% !important;
+    height:420px !important;
+}
+
+#status {
+    margin-bottom:10px;
+    color:#fbbf24;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+Débit Québec — Dashboard
+</header>
+
+<div class="container">
+
+<div id="status">Chargement...</div>
+
+<div class="card">
+    <canvas id="chart"></canvas>
+</div>
+
+</div>
+
+<script>
+
+const CSV_URL = "./data.csv";
+
+let chart = null;
+
+async function load(){
+
+    try {
+
+        const res = await fetch(CSV_URL + "?v=" + Date.now());
+        const text = await res.text();
+
+        const parsed = Papa.parse(text, {
+            header:true,
+            skipEmptyLines:true,
+            delimiter:""
+        });
+
+        let labels = [];
+        let values = [];
+
+        for (let r of parsed.data) {
+
+            const date = r.Date || r.date;
+            const debit = r.Debit || r.debit;
+
+            if(!date || !debit) continue;
+
+            labels.push(date);
+            values.push(parseFloat(debit));
+        }
+
+        if(values.length === 0){
+            throw new Error("CSV vide ou mauvais format (Date, Debit requis)");
+        }
+
+        draw(labels, values);
+
+        document.getElementById("status").innerText =
+            "✔ " + values.length + " points chargés";
+
+    } catch(e){
+        console.error(e);
+        document.getElementById("status").innerText =
+            "❌ Erreur chargement CSV";
+    }
+}
+
+function draw(labels, values){
+
+    if(chart) chart.destroy();
+
+    chart = new Chart(document.getElementById("chart"), {
+        type:"line",
+        data:{
+            labels:labels,
+            datasets:[{
+                data:values,
+                borderColor:"#60a5fa",
+                pointRadius:0
+            }]
+        },
+        options:{
+            plugins:{legend:{display:false}}
+        }
+    });
+}
+
+load();
+
+</script>
+
+</body>
+</html>
