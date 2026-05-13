@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Débit Québec Dashboard</title>
+<title>Débit Québec — Tableau de bord</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -37,26 +37,26 @@ button {
     padding:8px 12px;
     border-radius:8px;
     cursor:pointer;
+    margin-left:8px;
 }
 
 button:hover { background:#1d4ed8; }
 
-.container {
-    padding:18px;
-}
+.container { padding:18px; }
 
 .card {
     background:#111827;
     padding:14px;
     border-radius:12px;
     border:1px solid #1f2937;
-    margin-top:18px;
+    margin-bottom:18px;
 }
 
 .kpi {
     display:grid;
     grid-template-columns:repeat(4,1fr);
     gap:12px;
+    margin-bottom:18px;
 }
 
 .kpi-box {
@@ -77,8 +77,33 @@ canvas {
     height:420px !important;
 }
 
+table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+}
+
+th, td {
+    padding:10px;
+    border-bottom:1px solid #1f2937;
+}
+
+th {
+    color:#93c5fd;
+    text-align:left;
+}
+
+td {
+    color:#e5e7eb;
+    text-align:right;
+}
+
+td:first-child {
+    text-align:left;
+}
+
 #status {
-    margin:10px 0;
+    margin-bottom:10px;
     color:#fbbf24;
     font-size:13px;
 }
@@ -88,29 +113,46 @@ canvas {
 <body>
 
 <header>
-    <h1>Débit Québec — Dashboard</h1>
-    <button onclick="refreshData()">🔄 Mise à jour</button>
+    <h1>Débit Québec — Tableau de bord</h1>
+    <div>
+        <button onclick="refreshData()">🔄 Mise à jour</button>
+        <button onclick="downloadCSV()">⬇ Télécharger CSV</button>
+    </div>
 </header>
 
 <div class="container">
 
-<div id="status">Chargement des données...</div>
-
-<div id="kpi" class="kpi"></div>
+<div id="status">Chargement...</div>
 
 <div class="card">
-    <canvas id="chart"></canvas>
+    <canvas id="chartAnnual"></canvas>
+</div>
+
+<div class="card">
+    <canvas id="chartMonthly"></canvas>
+</div>
+
+<div class="card">
+    <h3 style="color:#93c5fd;">Table des statistiques</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Métrique</th>
+                <th>Valeur</th>
+            </tr>
+        </thead>
+        <tbody id="statsTable"></tbody>
+    </table>
 </div>
 
 </div>
 
 <script>
 
-// ================= FILE =================
-// GitHub Pages: file must be in same repo as index.html
 const CSV_URL = "./data.csv";
 
-let chart = null;
+let annualChart = null;
+let monthlyChart = null;
 let DATA = null;
 
 // ================= LOAD =================
@@ -118,130 +160,156 @@ async function loadData(){
 
     try {
 
-        document.getElementById("status").innerText =
-            "Chargement data.csv...";
+        document.getElementById("status").innerText = "Chargement des données...";
 
         const res = await fetch(CSV_URL + "?v=" + Date.now());
         const text = await res.text();
 
-        // 🔥 Detect broken fetch
-        if (!text || text.includes("<html")) {
-            throw new Error("Fichier non chargé (HTML reçu au lieu de CSV)");
-        }
-
-        // ================= PARSE (TSV SAFE) =================
         const parsed = Papa.parse(text, {
-            header: true,
-            skipEmptyLines: true,
-            delimitersToGuess: ["\t", ",", ";"]
+            header:true,
+            skipEmptyLines:true,
+            delimitersToGuess:["\t",",",";"]
         });
 
-        let dates = [];
-        let values = [];
+        let raw = [];
 
         for (let r of parsed.data) {
 
-            const date = r.Date || r.date;
-            const debit = r.Debit || r.debit;
+            const date = r.Date;
+            const debit = r.Debit;
 
-            if (!date || !debit) continue;
+            if(!date || !debit) continue;
 
-            const v = parseFloat(debit);
-            if (isNaN(v)) continue;
-
-            dates.push(date);
-            values.push(v);
+            raw.push({
+                date: date,
+                debit: parseFloat(debit)
+            });
         }
 
-        if (values.length === 0) {
-            throw new Error("Aucune donnée valide trouvée (vérifie Date / Debit)");
-        }
-
-        DATA = build(dates, values);
+        DATA = build(raw);
         render();
 
         document.getElementById("status").innerText =
-            "✔ " + values.length + " points chargés";
+            "✔ Données chargées : " + raw.length + " lignes";
 
-    } catch (err) {
+    } catch(err){
         console.error(err);
         document.getElementById("status").innerText =
-            "❌ Erreur: " + err.message;
+            "❌ Erreur chargement";
     }
 }
 
 // ================= BUILD =================
-function build(dates, values){
+function build(raw){
 
-    const sum = values.reduce((a,b)=>a+b,0);
-    const mean = sum / values.length;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    let values = raw.map(d=>d.debit);
+
+    let sum = values.reduce((a,b)=>a+b,0);
+    let mean = sum / values.length;
+    let min = Math.min(...values);
+    let max = Math.max(...values);
+
+    // monthly aggregation
+    let monthlyMap = {};
+
+    raw.forEach(r=>{
+        let m = r.date.slice(3,10); // MM/YYYY approx
+        if(!monthlyMap[m]) monthlyMap[m] = [];
+        monthlyMap[m].push(r.debit);
+    });
+
+    let monthlyLabels = Object.keys(monthlyMap);
+    let monthlyValues = monthlyLabels.map(k =>
+        monthlyMap[k].reduce((a,b)=>a+b,0) / monthlyMap[k].length
+    );
 
     return {
-        dates,
-        values,
-        kpi: { mean, min, max, sum }
+        raw,
+        kpi:{sum,mean,min,max},
+        monthly:{labels:monthlyLabels, values:monthlyValues}
     };
 }
 
 // ================= RENDER =================
 function render(){
-    renderKPI();
-    renderChart();
+    renderAnnual();
+    renderMonthly();
+    renderTable();
 }
 
-// ================= KPI =================
-function renderKPI(){
+// ================= ANNUAL =================
+function renderAnnual(){
 
-    const el = document.getElementById("kpi");
-    el.innerHTML = "";
+    if(annualChart) annualChart.destroy();
+
+    annualChart = new Chart(document.getElementById("chartAnnual"), {
+        type:"line",
+        data:{
+            labels: DATA.raw.map(d=>d.date),
+            datasets:[{
+                data: DATA.raw.map(d=>d.debit),
+                borderColor:"#60a5fa",
+                pointRadius:0,
+                tension:0.2
+            }]
+        },
+        options:{
+            plugins:{legend:{display:false}}
+        }
+    });
+}
+
+// ================= MONTHLY =================
+function renderMonthly(){
+
+    if(monthlyChart) monthlyChart.destroy();
+
+    monthlyChart = new Chart(document.getElementById("chartMonthly"), {
+        type:"bar",
+        data:{
+            labels: DATA.monthly.labels,
+            datasets:[{
+                data: DATA.monthly.values,
+                backgroundColor:"#2563eb"
+            }]
+        },
+        options:{
+            plugins:{legend:{display:false}}
+        }
+    });
+}
+
+// ================= TABLE =================
+function renderTable(){
 
     const k = DATA.kpi;
 
-    [
+    const rows = [
+        ["Somme", k.sum],
         ["Moyenne", k.mean],
-        ["Min", k.min],
-        ["Max", k.max],
-        ["Somme", k.sum]
-    ].forEach(x=>{
-        const div = document.createElement("div");
-        div.className = "kpi-box";
-        div.innerHTML = `
-            <div>${x[0]}</div>
-            <div class="kpi-value">${x[1].toFixed(2)}</div>
+        ["Minimum", k.min],
+        ["Maximum", k.max]
+    ];
+
+    const tbody = document.getElementById("statsTable");
+    tbody.innerHTML = "";
+
+    rows.forEach(r=>{
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${r[0]}</td>
+            <td>${r[1].toFixed(2)}</td>
         `;
-        el.appendChild(div);
+        tbody.appendChild(tr);
     });
 }
 
-// ================= CHART =================
-function renderChart(){
-
-    if (chart) chart.destroy();
-
-    chart = new Chart(document.getElementById("chart"), {
-        type: "line",
-        data: {
-            labels: DATA.dates,
-            datasets: [{
-                data: DATA.values,
-                borderColor: "#60a5fa",
-                pointRadius: 0,
-                tension: 0.25
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: { ticks: { color: "#9ca3af" } },
-                y: { ticks: { color: "#9ca3af" } }
-            }
-        }
-    });
+// ================= DOWNLOAD CSV =================
+function downloadCSV(){
+    const a = document.createElement("a");
+    a.href = CSV_URL;
+    a.download = "Debit_Quebec.csv";
+    a.click();
 }
 
 // ================= REFRESH =================
@@ -249,7 +317,6 @@ function refreshData(){
     loadData();
 }
 
-// INIT
 loadData();
 
 </script>
