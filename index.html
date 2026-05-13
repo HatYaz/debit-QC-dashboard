@@ -52,26 +52,6 @@ button:hover { background:#1d4ed8; }
     margin-bottom:18px;
 }
 
-.kpi {
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:12px;
-    margin-bottom:18px;
-}
-
-.kpi-box {
-    background:#111827;
-    padding:14px;
-    border-radius:12px;
-    border:1px solid #1f2937;
-}
-
-.kpi-value {
-    font-size:18px;
-    font-weight:700;
-    color:#60a5fa;
-}
-
 canvas {
     width:100% !important;
     height:420px !important;
@@ -80,7 +60,6 @@ canvas {
 table {
     width:100%;
     border-collapse:collapse;
-    font-size:13px;
 }
 
 th, td {
@@ -89,12 +68,11 @@ th, td {
 }
 
 th {
-    color:#93c5fd;
     text-align:left;
+    color:#93c5fd;
 }
 
 td {
-    color:#e5e7eb;
     text-align:right;
 }
 
@@ -103,7 +81,7 @@ td:first-child {
 }
 
 #status {
-    margin-bottom:10px;
+    margin:10px 0;
     color:#fbbf24;
     font-size:13px;
 }
@@ -122,26 +100,22 @@ td:first-child {
 
 <div class="container">
 
-<div id="status">Chargement...</div>
+<div id="status">Chargement des données...</div>
 
 <div class="card">
-    <canvas id="chartAnnual"></canvas>
+    <h3>📈 Débit annuel</h3>
+    <canvas id="annualChart"></canvas>
 </div>
 
 <div class="card">
-    <canvas id="chartMonthly"></canvas>
+    <h3>📊 Débit mensuel (somme)</h3>
+    <canvas id="monthlyChart"></canvas>
 </div>
 
 <div class="card">
-    <h3 style="color:#93c5fd;">Table des statistiques</h3>
+    <h3>📋 Statistiques</h3>
     <table>
-        <thead>
-            <tr>
-                <th>Métrique</th>
-                <th>Valeur</th>
-            </tr>
-        </thead>
-        <tbody id="statsTable"></tbody>
+        <tbody id="stats"></tbody>
     </table>
 </div>
 
@@ -160,7 +134,8 @@ async function loadData(){
 
     try {
 
-        document.getElementById("status").innerText = "Chargement des données...";
+        document.getElementById("status").innerText =
+            "Chargement du fichier...";
 
         const res = await fetch(CSV_URL + "?v=" + Date.now());
         const text = await res.text();
@@ -180,13 +155,16 @@ async function loadData(){
 
             if(!date || !debit) continue;
 
+            const v = parseFloat(debit);
+            if(isNaN(v)) continue;
+
             raw.push({
                 date: date,
-                debit: parseFloat(debit)
+                debit: v
             });
         }
 
-        DATA = build(raw);
+        DATA = process(raw);
         render();
 
         document.getElementById("status").innerText =
@@ -195,12 +173,12 @@ async function loadData(){
     } catch(err){
         console.error(err);
         document.getElementById("status").innerText =
-            "❌ Erreur chargement";
+            "❌ Erreur de chargement";
     }
 }
 
-// ================= BUILD =================
-function build(raw){
+// ================= PROCESS =================
+function process(raw){
 
     let values = raw.map(d=>d.debit);
 
@@ -209,24 +187,22 @@ function build(raw){
     let min = Math.min(...values);
     let max = Math.max(...values);
 
-    // monthly aggregation
-    let monthlyMap = {};
+    // MONTHLY aggregation (SUM)
+    let monthly = {};
 
     raw.forEach(r=>{
-        let m = r.date.slice(3,10); // MM/YYYY approx
-        if(!monthlyMap[m]) monthlyMap[m] = [];
-        monthlyMap[m].push(r.debit);
+        let m = r.date.split("/").slice(1).join("/"); // MM/YYYY
+        if(!monthly[m]) monthly[m] = 0;
+        monthly[m] += r.debit;
     });
-
-    let monthlyLabels = Object.keys(monthlyMap);
-    let monthlyValues = monthlyLabels.map(k =>
-        monthlyMap[k].reduce((a,b)=>a+b,0) / monthlyMap[k].length
-    );
 
     return {
         raw,
-        kpi:{sum,mean,min,max},
-        monthly:{labels:monthlyLabels, values:monthlyValues}
+        stats:{sum,mean,min,max},
+        monthly:{
+            labels:Object.keys(monthly),
+            values:Object.values(monthly)
+        }
     };
 }
 
@@ -234,7 +210,7 @@ function build(raw){
 function render(){
     renderAnnual();
     renderMonthly();
-    renderTable();
+    renderStats();
 }
 
 // ================= ANNUAL =================
@@ -242,7 +218,7 @@ function renderAnnual(){
 
     if(annualChart) annualChart.destroy();
 
-    annualChart = new Chart(document.getElementById("chartAnnual"), {
+    annualChart = new Chart(document.getElementById("annualChart"), {
         type:"line",
         data:{
             labels: DATA.raw.map(d=>d.date),
@@ -264,7 +240,7 @@ function renderMonthly(){
 
     if(monthlyChart) monthlyChart.destroy();
 
-    monthlyChart = new Chart(document.getElementById("chartMonthly"), {
+    monthlyChart = new Chart(document.getElementById("monthlyChart"), {
         type:"bar",
         data:{
             labels: DATA.monthly.labels,
@@ -279,19 +255,19 @@ function renderMonthly(){
     });
 }
 
-// ================= TABLE =================
-function renderTable(){
+// ================= STATS =================
+function renderStats(){
 
-    const k = DATA.kpi;
+    const s = DATA.stats;
 
     const rows = [
-        ["Somme", k.sum],
-        ["Moyenne", k.mean],
-        ["Minimum", k.min],
-        ["Maximum", k.max]
+        ["Somme", s.sum],
+        ["Moyenne", s.mean],
+        ["Minimum", s.min],
+        ["Maximum", s.max]
     ];
 
-    const tbody = document.getElementById("statsTable");
+    const tbody = document.getElementById("stats");
     tbody.innerHTML = "";
 
     rows.forEach(r=>{
@@ -304,12 +280,9 @@ function renderTable(){
     });
 }
 
-// ================= DOWNLOAD CSV =================
+// ================= DOWNLOAD =================
 function downloadCSV(){
-    const a = document.createElement("a");
-    a.href = CSV_URL;
-    a.download = "Debit_Quebec.csv";
-    a.click();
+    window.location.href = CSV_URL;
 }
 
 // ================= REFRESH =================
