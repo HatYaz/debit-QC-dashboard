@@ -3,365 +3,730 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Débit Québec — Dashboard Hydrologique</title>
 
-<title>Débit Québec — Dashboard</title>
-
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
-
-/* ================= LIGHT PROFESSIONAL THEME ================= */
-
-body{
-    margin:0;
-    font-family:"Segoe UI", Arial;
-    background:#f5f7fb;
-    color:#1f2937;
+:root {
+  --bg:          #0d1117;
+  --surface:     #161b22;
+  --surface2:    #1c2330;
+  --border:      #30363d;
+  --accent:      #1f6feb;
+  --accent-glow: rgba(31,111,235,0.18);
+  --accent2:     #3fb950;
+  --accent2-glow:rgba(63,185,80,0.15);
+  --warn:        #e3b341;
+  --text:        #e6edf3;
+  --text-muted:  #8b949e;
+  --text-faint:  #484f58;
+  --radius:      12px;
+  --radius-sm:   8px;
+  --mono:        "Space Mono", monospace;
+  --sans:        "DM Sans", sans-serif;
 }
 
-/* HEADER */
-header{
-    background:#ffffff;
-    padding:14px 18px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    border-bottom:1px solid #e5e7eb;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
 }
 
-h1{
-    margin:0;
-    font-size:18px;
-    color:#1e3a8a;
+/* ────────── HEADER ────────── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-/* BUTTONS */
-button{
-    background:#2563eb;
-    color:white;
-    border:none;
-    padding:10px 14px;
-    border-radius:10px;
-    cursor:pointer;
-    font-size:14px;
-    margin-left:6px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-button:hover{ background:#1d4ed8; }
-
-/* CONTAINER */
-.container{
-    padding:20px;
-    max-width:1400px;
-    margin:auto;
+.brand-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent), #58a6ff);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
 }
 
-/* KPI */
-.kpi{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:14px;
-    margin-bottom:18px;
+.brand-text { display: flex; flex-direction: column; }
+
+.brand-title {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.5px;
 }
 
-.kpi-box{
-    background:#ffffff;
-    border:1px solid #e5e7eb;
-    border-radius:12px;
-    padding:14px;
+.brand-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
 }
 
-.kpi-title{
-    font-size:14px;
-    color:#6b7280;
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+.btn {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex; align-items: center; gap: 6px;
 }
 
-.kpi-value{
-    font-size:22px;
-    font-weight:700;
-    color:#2563eb;
-    margin-top:6px;
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: #2f7cf0; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+
+/* ────────── STATUS BAR ────────── */
+#status-bar {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 28px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 20px;
+  align-items: center;
 }
 
-/* CARD */
-.card{
-    background:#ffffff;
-    border:1px solid #e5e7eb;
-    border-radius:14px;
-    padding:16px;
-    margin-bottom:18px;
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  display: inline-block;
+  margin-right: 6px;
+}
+.status-dot.ok { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+.status-dot.loading { background: var(--warn); animation: pulse 1s infinite; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ────────── LAYOUT ────────── */
+.container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
-/* CANVAS */
-canvas{
-    width:100% !important;
-    height:420px !important;
+/* ────────── KPI STRIP ────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
 }
 
-/* SELECT */
-select{
-    padding:10px;
-    border-radius:10px;
-    background:#ffffff;
-    color:#1f2937;
-    border:1px solid #d1d5db;
-    font-size:14px;
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.kpi-card:hover { border-color: var(--accent); }
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.kpi-card:nth-child(1)::before { background: linear-gradient(90deg, var(--accent), #58a6ff); }
+.kpi-card:nth-child(2)::before { background: linear-gradient(90deg, var(--accent2), #56d364); }
+.kpi-card:nth-child(3)::before { background: linear-gradient(90deg, #bc8cff, #d2a8ff); }
+.kpi-card:nth-child(4)::before { background: linear-gradient(90deg, var(--warn), #f0b04a); }
+
+.kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
 }
 
-/* STATUS */
-#status{
-    margin-bottom:10px;
-    color:#b45309;
-    font-size:14px;
+.kpi-value {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
 }
 
+.kpi-unit {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ────────── CARDS ────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.card-icon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+
+.card-body {
+  padding: 20px 22px;
+}
+
+/* ────────── CHART CONTAINER ────────── */
+.chart-wrap {
+  position: relative;
+  height: 380px;
+}
+
+/* ────────── MONTH SELECTOR ────────── */
+.month-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+select {
+  font-family: var(--sans);
+  font-size: 13px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+select:hover, select:focus { border-color: var(--accent); }
+
+/* ────────── RANGE PILLS ────────── */
+.range-pills {
+  display: flex;
+  gap: 4px;
+  background: var(--surface2);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--mono);
+  margin: 0;
+}
+.pill.active { background: var(--accent); color: #fff; }
+.pill:hover:not(.active) { background: var(--border); color: var(--text); }
+
+/* ────────── FOOTER ────────── */
+footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+}
+
+/* ────────── RESPONSIVE ────────── */
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .container { padding: 16px; }
+}
 </style>
 </head>
-
 <body>
 
+<!-- HEADER -->
 <header>
-    <h1>Débit Québec — Tableau de bord exécutif</h1>
-    <div>
-        <button onclick="refresh()">🔄 Mise à jour</button>
-        <button onclick="downloadCSV()">⬇ Télécharger CSV</button>
+  <div class="brand">
+    <div class="brand-icon">🌊</div>
+    <div class="brand-text">
+      <span class="brand-title">DÉBIT QUÉBEC</span>
+      <span class="brand-sub">Tableau de bord hydrologique — données SHOP100 - contact hatem.yazidi@dfo-mpo.gc.ca </span>
     </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="refresh()">↺ Mise à jour</button>
+    <button class="btn btn-primary" onclick="downloadCSV()">⬇ Exporter CSV</button>
+  </div>
 </header>
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <span><span class="status-dot loading" id="statusDot"></span><span id="statusText">Chargement des données…</span></span>
+  <span id="statusRange" style="color:var(--text-faint)"></span>
+</div>
 
 <div class="container">
 
-<div id="status">Chargement des données...</div>
+  <!-- KPI -->
+  <div class="kpi-grid" id="kpi"></div>
 
-<div class="kpi" id="kpi"></div>
+  <!-- PROFIL COMPLET -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">
+          <span style="background:var(--accent-glow);padding:5px 7px;border-radius:6px;">📈</span>
+          Profil de débit — période complète
+        </div>
+        <div class="card-subtitle">Survol pour lire la valeur exacte à chaque pas de temps</div>
+      </div>
+      <div class="range-pills" id="rangePills">
+        <button class="pill active" onclick="setRange('all',this)">Tout</button>
+        <button class="pill" onclick="setRange(365,this)">1 an</button>
+        <button class="pill" onclick="setRange(90,this)">90 j</button>
+        <button class="pill" onclick="setRange(30,this)">30 j</button>
+        <button class="pill" onclick="setRange(7,this)">7 j</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="chart-wrap"><canvas id="annualChart"></canvas></div>
+    </div>
+  </div>
 
-<div class="card">
-    <h3>📈 Débit annuel</h3>
-    <canvas id="annualChart"></canvas>
+  <!-- MENSUEL -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">
+          <span style="background:var(--accent2-glow);padding:5px 7px;border-radius:6px;">📊</span>
+          Débit total mensuel
+        </div>
+        <div class="card-subtitle">Somme du débit par mois-année</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="chart-wrap"><canvas id="monthlyChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- MENSUEL DETAIL -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">
+          <span style="background:rgba(188,140,255,0.15);padding:5px 7px;border-radius:6px;">📅</span>
+          Zoom mensuel
+        </div>
+        <div class="card-subtitle">Débit journalier pour le mois sélectionné</div>
+      </div>
+      <div class="month-controls">
+        <label style="font-size:12px;color:var(--text-muted)">Mois :</label>
+        <select id="monthSelect" onchange="renderMonth()"></select>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="chart-wrap"><canvas id="monthChart"></canvas></div>
+    </div>
+  </div>
+
 </div>
 
-<div class="card">
-    <h3>📊 Débit mensuel (total)</h3>
-    <canvas id="monthlyChart"></canvas>
-</div>
-
-<div class="card">
-    <h3>📅 Analyse par mois</h3>
-    <select id="monthSelect" onchange="renderMonth()"></select>
-    <canvas id="monthChart" style="margin-top:12px;"></canvas>
-</div>
-
-</div>
+<footer>GazEoL Renouvelable · Pipeline débit Québec · Données HRDPS-ECCC</footer>
 
 <script>
-
 const CSV_URL = "./data.csv";
 
 let annualChart, monthlyChart, monthChart;
 let DATA;
+let currentRange = 'all';
 
-// ================= LOAD =================
-async function load(){
+// ─── COMMON TOOLTIP ───────────────────────────────────────
+const tooltipPlugin = {
+  enabled: true,
+  mode: 'index',
+  intersect: false,
+  backgroundColor: '#1c2330',
+  borderColor: '#30363d',
+  borderWidth: 1,
+  titleColor: '#8b949e',
+  bodyColor: '#e6edf3',
+  titleFont: { family: "'Space Mono', monospace", size: 11 },
+  bodyFont: { family: "'Space Mono', monospace", size: 13, weight: '700' },
+  padding: 12,
+  cornerRadius: 8,
+  displayColors: false,
+  callbacks: {
+    title: items => items[0].label,
+    label: item => `Débit : ${Number(item.raw).toLocaleString('fr-CA', {minimumFractionDigits:2, maximumFractionDigits:2})} m³/s`
+  }
+};
 
-    document.getElementById("status").innerText = "Chargement...";
+// ─── CROSSHAIR PLUGIN ─────────────────────────────────────
+const crosshairPlugin = {
+  id: 'crosshair',
+  afterDraw(chart) {
+    if (!chart.tooltip._active || !chart.tooltip._active.length) return;
+    const ctx = chart.ctx;
+    const x = chart.tooltip._active[0].element.x;
+    const top = chart.chartArea.top;
+    const bottom = chart.chartArea.bottom;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(31,111,235,0.4)';
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+Chart.register(crosshairPlugin);
 
+// ─── COMMON OPTIONS ───────────────────────────────────────
+function makeOptions(extras = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: tooltipPlugin
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(48,54,61,0.6)', drawBorder: false },
+        ticks: {
+          color: '#8b949e',
+          font: { family: "'Space Mono', monospace", size: 10 },
+          maxRotation: 45,
+          minRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 14
+        }
+      },
+      y: {
+        grid: { color: 'rgba(48,54,61,0.6)', drawBorder: false },
+        ticks: {
+          color: '#8b949e',
+          font: { family: "'Space Mono', monospace", size: 10 },
+          callback: v => v.toLocaleString('fr-CA')
+        },
+        title: {
+          display: true,
+          text: 'Débit (m³/s)',
+          color: '#8b949e',
+          font: { family: "'DM Sans', sans-serif", size: 11 }
+        }
+      }
+    },
+    animation: { duration: 500, easing: 'easeInOutQuart' },
+    ...extras
+  };
+}
+
+// ─── LOAD ─────────────────────────────────────────────────
+async function load() {
+  setStatus('loading', 'Chargement des données…', '');
+  try {
     const res = await fetch(CSV_URL + "?v=" + Date.now());
     const text = await res.text();
-
     const parsed = Papa.parse(text, {
-        header:true,
-        skipEmptyLines:true,
-        delimitersToGuess:["\t",",",";"]
+      header: true,
+      skipEmptyLines: true,
+      delimitersToGuess: ["\t", ",", ";"]
     });
 
     let raw = [];
-
-    parsed.data.forEach(r=>{
-        if(!r.Date || !r.Debit) return;
-
-        const v = parseFloat(r.Debit);
-        if(isNaN(v)) return;
-
-        raw.push({
-            date:r.Date,
-            debit:v
-        });
+    parsed.data.forEach(r => {
+      // Support "Date / Heure / Debit" or "Date / Debit" formats
+      const dateKey = Object.keys(r).find(k => /date/i.test(k));
+      const debitKey = Object.keys(r).find(k => /debit/i.test(k));
+      if (!dateKey || !debitKey) return;
+      const v = parseFloat(r[debitKey]);
+      if (!r[dateKey] || isNaN(v)) return;
+      raw.push({ date: r[dateKey].trim(), debit: v });
     });
 
     DATA = process(raw);
     renderAll();
 
-    document.getElementById("status").innerText =
-        "✔ Données chargées : " + raw.length + " lignes";
+    const first = raw[0]?.date ?? '';
+    const last = raw[raw.length - 1]?.date ?? '';
+    setStatus('ok', `✔ ${raw.length.toLocaleString('fr-CA')} observations chargées`, `Période : ${first} → ${last}`);
+  } catch(e) {
+    setStatus('loading', '✗ Impossible de charger data.csv — ' + e.message, '');
+  }
 }
 
-// ================= PROCESS =================
-function process(raw){
-
-    const values = raw.map(d=>d.debit);
-
-    const sum = values.reduce((a,b)=>a+b,0);
-    const mean = sum / values.length;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-
-    const monthly = {};
-    raw.forEach(r=>{
-        const m = r.date.slice(3,10);
-        monthly[m] = (monthly[m] || 0) + r.debit;
-    });
-
-    return {
-        raw,
-        kpi:{sum,mean,min,max},
-        monthly:{
-            labels:Object.keys(monthly),
-            values:Object.values(monthly)
-        }
-    };
+function setStatus(state, text, range) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot ' + state;
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('statusRange').textContent = range;
 }
 
-// ================= COMMON CHART OPTIONS =================
-const commonOptions = {
-    responsive:true,
-    maintainAspectRatio:false,
-    plugins:{
-        legend:{ display:false },   // ✅ removed legend
-        tooltip:{
-            enabled:true,
-            displayColors:false,
-            titleFont:{ size:14 },
-            bodyFont:{ size:14 }
-        }
+// ─── PROCESS ──────────────────────────────────────────────
+function process(raw) {
+  const values = raw.map(d => d.debit);
+  const sum = values.reduce((a, b) => a + b, 0);
+  const mean = sum / values.length;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+
+  // Monthly aggregation — key = "MM/YYYY" extracted robustly
+  const monthly = {};
+  raw.forEach(r => {
+    const parts = r.date.split('/');
+    if (parts.length < 3) return;
+    // dd/mm/yyyy  or  mm/dd/yyyy — use year + month position 1
+    const key = parts[1] + '/' + parts[2]; // mm/yyyy
+    monthly[key] = (monthly[key] || 0) + r.debit;
+  });
+
+  return {
+    raw,
+    kpi: { sum, mean, min, max, n: values.length },
+    monthly: { labels: Object.keys(monthly), values: Object.values(monthly) }
+  };
+}
+
+// ─── RENDER ALL ───────────────────────────────────────────
+function renderAll() {
+  renderKPI();
+  renderAnnual('all');
+  renderMonthly();
+  fillMonths();
+}
+
+// ─── KPI ──────────────────────────────────────────────────
+function renderKPI() {
+  const k = DATA.kpi;
+  const fmt = (n, d=2) => n.toLocaleString('fr-CA', { minimumFractionDigits: d, maximumFractionDigits: d });
+  document.getElementById('kpi').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Débit moyen</div>
+      <div class="kpi-value">${fmt(k.mean)}</div>
+      <div class="kpi-unit">m³/s · ${k.n.toLocaleString('fr-CA')} obs.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Débit maximum</div>
+      <div class="kpi-value">${fmt(k.max)}</div>
+      <div class="kpi-unit">m³/s</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Débit minimum</div>
+      <div class="kpi-value">${fmt(k.min)}</div>
+      <div class="kpi-unit">m³/s</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Volume cumulé</div>
+      <div class="kpi-value">${(k.sum/1e6).toLocaleString('fr-CA',{minimumFractionDigits:1,maximumFractionDigits:1})}</div>
+      <div class="kpi-unit">× 10⁶ m³/s (somme)</div>
+    </div>
+  `;
+}
+
+// ─── ANNUAL ───────────────────────────────────────────────
+function setRange(range, btn) {
+  currentRange = range;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderAnnual(range);
+}
+
+function renderAnnual(range) {
+  let subset = DATA.raw;
+  if (range !== 'all') {
+    subset = DATA.raw.slice(-range);
+  }
+
+  const gradient = ctx => {
+    const g = ctx.createLinearGradient(0, 0, 0, 380);
+    g.addColorStop(0, 'rgba(31,111,235,0.3)');
+    g.addColorStop(1, 'rgba(31,111,235,0.0)');
+    return g;
+  };
+
+  if (annualChart) annualChart.destroy();
+  annualChart = new Chart(document.getElementById('annualChart'), {
+    type: 'line',
+    data: {
+      labels: subset.map(d => d.date),
+      datasets: [{
+        data: subset.map(d => d.debit),
+        borderColor: '#1f6feb',
+        borderWidth: 1.8,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: '#58a6ff',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2,
+        fill: true,
+        backgroundColor: ctx => gradient(ctx.chart.ctx),
+        tension: 0.25
+      }]
     },
-    scales:{
-        x:{
-            ticks:{
-                font:{ size:15 },
-                maxRotation:90,   // ✅ vertical labels
-                minRotation:90,
-                autoSkip:true,
-                maxTicksLimit:12
-            }
-        },
-        y:{
-            ticks:{ font:{ size:15 } }
+    options: makeOptions()
+  });
+}
+
+// ─── MONTHLY ──────────────────────────────────────────────
+function renderMonthly() {
+  if (monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: DATA.monthly.labels,
+      datasets: [{
+        data: DATA.monthly.values,
+        backgroundColor: 'rgba(63,185,80,0.65)',
+        hoverBackgroundColor: '#3fb950',
+        borderRadius: 4,
+        borderSkipped: false
+      }]
+    },
+    options: makeOptions({
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...tooltipPlugin,
+          callbacks: {
+            title: items => 'Mois : ' + items[0].label,
+            label: item => `Total : ${Number(item.raw).toLocaleString('fr-CA', {minimumFractionDigits:2})} m³/s`
+          }
         }
-    }
-};
-
-// ================= RENDER =================
-function renderAll(){
-    renderKPI();
-    renderAnnual();
-    renderMonthly();
-    fillMonths();
+      }
+    })
+  });
 }
 
-// ================= KPI =================
-function renderKPI(){
-
-    const k = DATA.kpi;
-
-    document.getElementById("kpi").innerHTML = `
-        <div class="kpi-box"><div class="kpi-title">Somme</div><div class="kpi-value">${k.sum.toFixed(2)}</div></div>
-        <div class="kpi-box"><div class="kpi-title">Moyenne</div><div class="kpi-value">${k.mean.toFixed(2)}</div></div>
-        <div class="kpi-box"><div class="kpi-title">Minimum</div><div class="kpi-value">${k.min.toFixed(2)}</div></div>
-        <div class="kpi-box"><div class="kpi-title">Maximum</div><div class="kpi-value">${k.max.toFixed(2)}</div></div>
-    `;
+// ─── MONTH SELECT ─────────────────────────────────────────
+function fillMonths() {
+  const sel = document.getElementById('monthSelect');
+  sel.innerHTML = '';
+  DATA.monthly.labels.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m;
+    o.textContent = m;
+    sel.appendChild(o);
+  });
+  // Default to last month
+  sel.selectedIndex = DATA.monthly.labels.length - 1;
+  renderMonth();
 }
 
-// ================= ANNUAL =================
-function renderAnnual(){
+function renderMonth() {
+  const m = document.getElementById('monthSelect').value;
+  // m = "mm/yyyy" — match rows where date contains that month/year
+  const [mm, yyyy] = m.split('/');
+  const data = DATA.raw.filter(d => {
+    const parts = d.date.split('/');
+    if (parts.length < 3) return false;
+    return parts[1] === mm && parts[2] === yyyy;
+  });
 
-    if(annualChart) annualChart.destroy();
-
-    annualChart = new Chart(document.getElementById("annualChart"),{
-        type:"line",
-        data:{
-            labels:DATA.raw.map(d=>d.date),
-            datasets:[{
-                data:DATA.raw.map(d=>d.debit),
-                borderColor:"#2563eb",
-                pointRadius:0,
-                pointHoverRadius:6,
-                tension:0.25
-            }]
-        },
-        options: commonOptions
-    });
+  if (monthChart) monthChart.destroy();
+  monthChart = new Chart(document.getElementById('monthChart'), {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.date),
+      datasets: [{
+        data: data.map(d => d.debit),
+        borderColor: '#bc8cff',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: '#bc8cff',
+        pointHoverRadius: 7,
+        pointHoverBackgroundColor: '#d2a8ff',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2,
+        fill: true,
+        backgroundColor: 'rgba(188,140,255,0.08)',
+        tension: 0.3
+      }]
+    },
+    options: makeOptions()
+  });
 }
 
-// ================= MONTHLY =================
-function renderMonthly(){
-
-    if(monthlyChart) monthlyChart.destroy();
-
-    monthlyChart = new Chart(document.getElementById("monthlyChart"),{
-        type:"bar",
-        data:{
-            labels:DATA.monthly.labels,
-            datasets:[{
-                data:DATA.monthly.values,
-                backgroundColor:"#2563eb"
-            }]
-        },
-        options: commonOptions
-    });
-}
-
-// ================= MONTH SELECT =================
-function fillMonths(){
-
-    const sel = document.getElementById("monthSelect");
-    sel.innerHTML = "";
-
-    DATA.monthly.labels.forEach(m=>{
-        const opt = document.createElement("option");
-        opt.value = m;
-        opt.textContent = m;
-        sel.appendChild(opt);
-    });
-
-    renderMonth();
-}
-
-// ================= MONTH DETAIL =================
-function renderMonth(){
-
-    const m = document.getElementById("monthSelect").value;
-    const data = DATA.raw.filter(d=>d.date.includes(m));
-
-    if(monthChart) monthChart.destroy();
-
-    monthChart = new Chart(document.getElementById("monthChart"),{
-        type:"line",
-        data:{
-            labels:data.map(d=>d.date),
-            datasets:[{
-                data:data.map(d=>d.debit),
-                borderColor:"#16a34a",
-                pointRadius:2,
-                pointHoverRadius:6
-            }]
-        },
-        options: commonOptions
-    });
-}
-
-// ================= DOWNLOAD =================
-function downloadCSV(){
-    window.location.href = CSV_URL;
-}
-
-// ================= REFRESH =================
-function refresh(){
-    load();
-}
+// ─── DOWNLOAD ─────────────────────────────────────────────
+function downloadCSV() { window.location.href = CSV_URL; }
+function refresh() { load(); }
 
 load();
-
 </script>
-
 </body>
 </html>
